@@ -27,7 +27,8 @@
                 "run",
                 "/Users/sangyun/Documents/Coding_Workspace/skktudy/skktudy_chatbot/src/app.py"
             ],
-            "jinja": true
+            "jinja": true,
+            "justMyCode": false
         }
     ]
 }
