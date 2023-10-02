@@ -1,75 +1,24 @@
-from typing import Any, Optional, Type
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence
 
-import openai
 from dotenv import load_dotenv
-from langchain.agents import AgentType, Tool, initialize_agent
-from langchain.callbacks.manager import (AsyncCallbackManagerForToolRun,
-                                         CallbackManagerForToolRun)
-from langchain.chat_models import ChatOpenAI
-from langchain.llms import OpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain.schema import AIMessage, HumanMessage, SystemMessage
-from langchain.tools import BaseTool, StructuredTool, Tool, tool
-from langchain.utilities import SerpAPIWrapper
-from langchain.document_loaders import PyPDFLoader
-from langchain.prompts import (
-    ChatPromptTemplate,
-    MessagesPlaceholder,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
-from langchain.agents import AgentExecutor
-# from langchain.agents.output_parsers import JSONAgentOutputParser
-from output_parsers import JSONAgentOutputParser
-from langchain.agents.format_scratchpad import format_log_to_messages
-
+from langchain.agents import AgentExecutor, Tool
 from langchain.agents.conversational_chat.output_parser import ConvoOutputParser
-
+from langchain.agents.format_scratchpad import format_log_to_messages
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import MessagesPlaceholder
 from langchain.prompts.chat import (
     ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    AIMessagePromptTemplate,
     HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
 )
-from langchain.schema import AgentAction, BaseOutputParser, BasePromptTemplate
+from langchain.schema import BaseOutputParser, BasePromptTemplate, HumanMessage
+from langchain.tools import BaseTool, Tool
 
-from langchain.chains import LLMChain
-from templates import (
-    PREFIX,
-    SUFFIX,
-    TEMPLATE_TOOL_RESPONSE,
-    FORMAT_INSTRUCTIONS,
-)
+from output_parsers import JSONAgentOutputParser
+from templates import FORMAT_INSTRUCTIONS, PREFIX, SUFFIX, TEMPLATE_TOOL_RESPONSE
 
 load_dotenv()
-
-base_prompt = ChatPromptTemplate(
-    messages=[
-        SystemMessagePromptTemplate.from_template(PREFIX),
-        MessagesPlaceholder(variable_name="chat_history"),
-        HumanMessagePromptTemplate.from_template("{question}")
-    ]
-)
-
-memory = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
-
-def _handle_error(error) -> str:
-    return str(error)[:50]
-
-def summarize_template(query: str) -> str:
-    template = ChatPromptTemplate.from_messages(
-        [
-            SystemMessage(
-                content=(
-                    """You are a helpful assistant that summarizes a document.
-                    Give clear and concise summaries of the document."""
-                )
-            ),
-            HumanMessagePromptTemplate.from_template("{text}"),
-        ]
-    )
-
 
 
 class Chatbot:
@@ -77,56 +26,49 @@ class Chatbot:
         self,
         model_name: str = "gpt-3.5-turbo",
     ):
+        # Initialize the chatbot with model, memory, tool and prompt
         chat_model = ChatOpenAI(model_name=model_name, temperature=0)
-
-        # self.summaryChain = LLMChain(llm=self.llm, prompt="Prompt")
-
-        chatbot = LLMChain(
-            llm=chat_model,
-            prompt=base_prompt,
-            verbose=True,
+        memory = ConversationBufferMemory(
+            memory_key="chat_history", return_messages=True
         )
         tools = [
             Tool(
-                name="Summary",
-                func=chatbot.run,
-                description="useful only when you need summarize a given pdf document",
+                name="Dummy Tool for creating agents",
+                func=lambda x: x,
+                description="Do not use this tool",
                 return_direct=True,
             )
         ]
-
-
         prompt = self.create_prompt(
             tools,
             system_message=PREFIX,
             human_message=SUFFIX,
             input_variables=None,
-            output_parser=ConvoOutputParser()
+            output_parser=ConvoOutputParser(),
         )
         chat_model_with_stop = chat_model.bind(stop=["\nObservation"])
 
+        agent = (
+            {
+                "input": lambda x: x["input"],
+                "agent_scratchpad": lambda x: format_log_to_messages(
+                    x["intermediate_steps"],
+                    template_tool_response=TEMPLATE_TOOL_RESPONSE,
+                ),
+                "chat_history": lambda x: x["chat_history"],
+            }
+            | prompt
+            | chat_model_with_stop
+            | JSONAgentOutputParser()
+        )
 
-        agent = {
-            "input": lambda x: x["input"],
-            "agent_scratchpad": lambda x: format_log_to_messages(x['intermediate_steps'], template_tool_response=TEMPLATE_TOOL_RESPONSE),
-            "chat_history": lambda x: x["chat_history"],
-        } | prompt | chat_model_with_stop | JSONAgentOutputParser()
+        self.agent = AgentExecutor(
+            agent=agent, tools=tools, verbose=False, memory=memory
+        )
 
-
-        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-        self.agent = AgentExecutor(agent=agent, tools=tools, verbose=True, memory=memory)
-
-
-
-    def __call__(
-        self,
-        messages: list[HumanMessage], 
-        files: Optional[list[str]] = None,
-        **kwargs: Any
-    ) -> Any:
-        ret = self.agent.invoke({'input': messages})['output']
-        print(ret)
-        return ret
+    def __call__(self, messages: List[HumanMessage], **kwargs: Any) -> Any:
+        response = self.agent.invoke({"input": messages})["output"]
+        return response
 
     @classmethod
     def create_prompt(
@@ -141,7 +83,6 @@ class Chatbot:
             [f"> {tool.name}: {tool.description}" for tool in tools]
         )
         tool_names = ", ".join([tool.name for tool in tools])
-        _output_parser = output_parser
         format_instructions = human_message.format(
             format_instructions=FORMAT_INSTRUCTIONS
         )
