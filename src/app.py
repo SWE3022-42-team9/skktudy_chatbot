@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import streamlit as st
@@ -8,7 +7,6 @@ from chatbot import Chatbot
 FILE_SAVE_PATH = str(Path(__file__).parent.parent) + "/data/"
 
 
-@st.cache_resource
 def load_model(model_name: str):
     return Chatbot(model_name=model_name)
 
@@ -43,7 +41,7 @@ def main():
         )
 
     # Chatbot
-    Chatbot = load_model(model_name="gpt-4")
+    Chatbot = load_model(model_name="gpt-4-1106-preview")
     if prompt := st.chat_input():
         st.session_state["messages"].append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
@@ -63,9 +61,6 @@ def main():
         st.session_state["messages"].append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)
 
-
-
-    
 
 if __name__ == "__main__":
     main()
