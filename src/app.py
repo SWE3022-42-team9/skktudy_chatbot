@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import os
 import streamlit as st
 
 from chatbot import Chatbot
@@ -13,14 +13,14 @@ def load_model(model_name: str):
 
 def main():
     # App configurations
-    st.title("💬 SKKTUDY CHATBOT")
+    st.title("💬 SKK:tudy CHATBOT")
     st.caption("🚀 기능 데모 프로그램")
 
     if "messages" not in st.session_state:
         st.session_state["messages"] = [
             {
                 "role": "assistant",
-                "content": "안녕하세요! 저는 교육용 챗봇: SKKutor입니다. 어떤 도움이 필요하신가요?",
+                "content": "안녕하세요! 저는 교육용 SKKtudy 챗봇입니다. 어떤 도움이 필요하신가요?",
             }
         ]
 
@@ -57,6 +57,10 @@ def main():
                 file.close()
 
         response = Chatbot(messages=prompt, files=st.session_state["files"])
+
+        if st.session_state["files"] != []:
+            for file in st.session_state["files"]:
+                os.remove(file)
 
         st.session_state["messages"].append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)

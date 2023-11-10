@@ -17,11 +17,7 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.tools import Tool
 from langchain.vectorstores import FAISS
 
-from templates import (
-    PREFIX,
-    QA_TEMPLATE,
-    SUFFIX,
-)
+from templates import PREFIX, QA_TEMPLATE, SUFFIX
 
 load_dotenv()
 
@@ -55,9 +51,8 @@ class Chatbot:
 
         self.update_agent()
 
-        response = self.agent.invoke({"input": messages})
-        print(response)
-        return response["output"]
+        response = self.agent.invoke({"input": messages})["output"]
+        return response
 
     @classmethod
     def load_documents(self, files):
@@ -83,17 +78,16 @@ class Chatbot:
 
     @classmethod
     def update_agent(self):
-        if st.session_state["retriever"] is None:
-            tools = [
-                Tool(
-                    name="Dummy Tool for creating agents",
-                    func=lambda x: x,
-                    description="Do not use this tool",
-                    return_direct=True,
-                )
-            ]
+        tools = [
+            Tool(
+                name="Dummy Tool for creating agents",
+                func=lambda x: x,
+                description="Do not use this tool",
+                return_direct=True,
+            )
+        ]
 
-        else:
+        if st.session_state["retriever"]:
             prompt = PromptTemplate(
                 template=QA_TEMPLATE, input_variables=["context", "question"]
             )
@@ -104,17 +98,17 @@ class Chatbot:
                 chain_type="stuff",
                 memory=st.session_state["memory"],
                 chain_type_kwargs={"prompt": prompt},
-                verbose=True,
+                verbose=False,
             )
 
-            tools = [
+            tools.append(
                 Tool(
                     name="QA",
                     func=qa_chain.run,
                     description="useful for when you need to answer a question about a document, image, or file",
                     return_direct=True,
                 )
-            ]
+            )
 
         agent = ConversationalChatAgent.from_llm_and_tools(
             llm=st.session_state["chat_model"],
@@ -124,5 +118,5 @@ class Chatbot:
             output_parser=ConvoOutputParser(),
         )
         self.agent = AgentExecutor(
-            agent=agent, tools=tools, verbose=True, memory=st.session_state["memory"]
+            agent=agent, tools=tools, verbose=False, memory=st.session_state["memory"]
         )
