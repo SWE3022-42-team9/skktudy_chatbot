@@ -120,3 +120,12 @@ class Chatbot:
         self.agent = AgentExecutor(
             agent=agent, tools=tools, verbose=False, memory=st.session_state["memory"]
         )
+
+    @classmethod
+    def reset_agent(self):
+        st.session_state["memory"] = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+        )
+
+        self.update_agent()

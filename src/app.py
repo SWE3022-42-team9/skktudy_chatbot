@@ -13,7 +13,7 @@ def load_model(model_name: str):
 
 def main():
     # App configurations
-    st.title("💬 SKK:tudy CHATBOT")
+    st.title("💬 SKKtudy CHATBOT")
     st.caption("🚀 기능 데모 프로그램")
 
     if "messages" not in st.session_state:
@@ -64,6 +64,9 @@ def main():
 
         st.session_state["messages"].append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)
+
+    if st.sidebar.button("Reset Session"):
+        Chatbot.reset_agent()
 
 
 if __name__ == "__main__":
