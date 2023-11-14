@@ -122,7 +122,7 @@ class Chatbot:
         )
 
     @classmethod
-    def reset_agent(self):
+    def reset_session(self):
         st.session_state["memory"] = ConversationBufferMemory(
             memory_key="chat_history",
             return_messages=True,

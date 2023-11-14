@@ -1,5 +1,6 @@
-from pathlib import Path
 import os
+from pathlib import Path
+
 import streamlit as st
 
 from chatbot import Chatbot
@@ -66,7 +67,7 @@ def main():
         st.chat_message("assistant").write(response)
 
     if st.sidebar.button("Reset Session"):
-        Chatbot.reset_agent()
+        Chatbot.reset_session()
 
 
 if __name__ == "__main__":
