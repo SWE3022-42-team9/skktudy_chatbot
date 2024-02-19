@@ -1,40 +1,118 @@
-import streamlit as st
+import json
+from pathlib import Path
+from typing import List
+
+from flask import Flask, request
 
 from chatbot import Chatbot
 
-
-@st.cache_resource
-def load_model(model_name: str):
-    return Chatbot(model_name=model_name)
+FILE_SAVE_PATH = str(Path(__file__).parent.parent) + "/data/"
 
 
-def main():
-    # App configurations
-    st.title("💬 SKKTUDY CHATBOT")
-    st.caption("🚀 기능 데모 프로그램")
+chatbots = {}
 
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = [
-            {
-                "role": "assistant",
-                "content": "안녕하세요! 저는 교육용 챗봇: SKKutor입니다. 어떤 도움이 필요하신가요?",
-            }
-        ]
+app = Flask(__name__)
 
-    for msg in st.session_state["messages"]:
-        st.chat_message(msg["role"]).write(msg["content"])
 
-    # Chatbot
-    Chatbot = load_model(model_name="gpt-4")
-    if prompt := st.chat_input():
-        st.session_state["messages"].append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
+# TODO: Add image decode method
+@app.route("/chatbot/send", methods=["POST"])
+def chatbot_send() -> str:
+    """
+    Main method for initializing the chatbot with uid, and sending requests to OPENAI API through the chatbot object and returning the response.
 
-        response = Chatbot(messages=prompt)
+    Args:
+        uid (`str`):
+            The user id for the chatbot. This is used to keep track of the chatbot's memory and state independently for each user.
+        message (`str`):
+            The message to send to the chatbot. This is the message that the chatbot will respond to.
+        files (`List[str]`, *optional*):
+            Not yet implemented. This will be used to send files/images to the chatbot for QA, summarization, quiz generation, etc.
 
-        st.session_state["messages"].append({"role": "assistant", "content": response})
-        st.chat_message("assistant").write(response)
+
+    Returns:
+        response (`str`): The response from the chatbot.
+    """
+
+    if request.method == "POST":
+        data = request.get_json()
+
+        uid = data["uid"]
+        message = data["message"]
+
+        if uid not in chatbots:
+            chatbots[uid] = Chatbot()
+
+        response = chatbots[uid](messages=message, files=None)
+        return response
+
+
+@app.route("/chatbot/log", methods=["POST"])
+def chatbot_log() -> dict[int, List[dict[str, str]]]:
+    """
+    Returns the chat history for the chatbot given the user id.
+
+    Args:
+        uid (`str`):
+            The user id for the chatbot. This is used to return the chat history specific to the user.
+
+    Returns:
+        log (`dict[int, List[dict[str, str]]]`): The history of the chatbot's conversation with the user.
+
+        e.g. log = {
+        0: [{'human': 'Hello'}, {'ai': 'Hi, how are you?'}],
+        1: [{'human': 'Who are you?'}, {'ai': 'I am a chatbot.'}]
+        }
+    """
+
+    if request.method == "POST":
+        data = request.get_json()
+
+        uid = data["uid"]
+
+        log = {}
+        for i in range(0, len(chatbots[uid].memory.buffer), 2):
+            log[int(i / 2)] = [
+                {
+                    chatbots[uid]
+                    .memory.buffer[i]
+                    .type: chatbots[uid]
+                    .memory.buffer[i]
+                    .content
+                },
+                {
+                    chatbots[uid]
+                    .memory.buffer[i + 1]
+                    .type: chatbots[uid]
+                    .memory.buffer[i + 1]
+                    .content
+                },
+            ]
+
+        # Wrap the log in a JSON object and encode it in UTF-8 for korean characters
+        return json.dumps(log, ensure_ascii=False).encode("utf8")
+
+
+@app.route("/chatbot/reset", methods=["POST"])
+def chatbot_reset() -> None:
+    """
+    Resets the chatbot's memory and state given the user id.
+
+    Args:
+        uid (`str`):
+            The user id for the chatbot. This is used to reset the chatbot's memory and state specific to the user.
+
+    Returns:
+        None
+    """
+    if request.method == "POST":
+        data = request.get_json()
+
+        uid = data["uid"]
+
+        chatbots[uid].reset_session()
+
+        return "Reset Success", 200
 
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0")
